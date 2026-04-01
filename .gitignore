@@ -5,3 +5,5 @@ __pycache__/
 *.pyd
 *.log
 clinvar.vcf.gz
+saved_reports/
+artifacts_backup_legacy/

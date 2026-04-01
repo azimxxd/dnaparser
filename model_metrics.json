@@ -1,0 +1,57 @@
+{
+  "clinvar_path": "clinvar.vcf.gz",
+  "sample_limit": null,
+  "random_state": 42,
+  "feature_cols": [
+    "CHROM",
+    "POS",
+    "REF",
+    "ALT",
+    "AF_ESP",
+    "AF_EXAC",
+    "AF_TGP",
+    "CLNVC",
+    "GENEINFO",
+    "MC",
+    "ORIGIN",
+    "IS_TRANSITION"
+  ],
+  "categorical_cols": [
+    "CHROM",
+    "REF",
+    "ALT",
+    "CLNVC",
+    "GENEINFO",
+    "MC",
+    "ORIGIN"
+  ],
+  "rows_after_filtering": 1468323,
+  "train_rows": 1027825,
+  "validation_rows": 220249,
+  "test_rows": 220249,
+  "validation_metrics": {
+    "roc_auc": 0.993594,
+    "average_precision": 0.972034,
+    "pathogenic_precision": 0.786132,
+    "pathogenic_recall": 0.967571,
+    "pathogenic_f1": 0.867466,
+    "benign_precision": 0.995189,
+    "benign_recall": 0.962242,
+    "benign_f1": 0.978438,
+    "support_pathogenic": 27630,
+    "support_benign": 192619
+  },
+  "test_metrics": {
+    "roc_auc": 0.993644,
+    "average_precision": 0.972361,
+    "pathogenic_precision": 0.785867,
+    "pathogenic_recall": 0.968042,
+    "pathogenic_f1": 0.867494,
+    "benign_precision": 0.995258,
+    "benign_recall": 0.962164,
+    "benign_f1": 0.978431,
+    "support_pathogenic": 27630,
+    "support_benign": 192619
+  },
+  "best_iteration": 1399
+}
