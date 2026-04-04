@@ -4,4 +4,6 @@ __pycache__/
 *.pyo
 *.pyd
 *.log
-clinvar.vcf.gz
+*.joblib
+*.vcf
+*.vcf.gz

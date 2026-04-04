@@ -18,7 +18,7 @@ from typing import Any
 import joblib
 import numpy as np
 from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -249,8 +249,239 @@ def real_ml_predict(batch: list[dict[str, str]]) -> list[dict[str, Any]]:
 
 
 # ============================================================================
-# Endpoint
+# Endpoints
 # ============================================================================
+
+@app.get("/health")
+async def health_check():
+    """Lightweight health check for Docker and monitoring."""
+    return {"status": "healthy", "model_features": len(FEATURE_COLUMNS)}
+
+
+_INDEX_HTML = """\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VCF Variant Risk Analyzer</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#080c14;color:#e2e8f0;min-height:100vh;overflow-x:hidden}
+.bg{position:fixed;inset:0;z-index:0;overflow:hidden}
+.bg::before,.bg::after{content:'';position:absolute;border-radius:50%;filter:blur(120px);opacity:.35;animation:float 12s ease-in-out infinite}
+.bg::before{width:600px;height:600px;background:radial-gradient(circle,#06b6d4,transparent 70%);top:-10%;left:-5%;animation-delay:0s}
+.bg::after{width:500px;height:500px;background:radial-gradient(circle,#8b5cf6,transparent 70%);bottom:-10%;right:-5%;animation-delay:-6s}
+@keyframes float{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,30px) scale(1.1)}}
+.container{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:2.5rem 1.5rem}
+header{text-align:center;margin-bottom:2.5rem;animation:fadeIn .8s ease-out}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+h1{font-size:2.2rem;font-weight:800;background:linear-gradient(135deg,#06b6d4,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.4rem}
+.subtitle{color:rgba(255,255,255,.5);font-size:1rem}
+.glass{background:rgba(255,255,255,.04);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:2rem;margin-bottom:1.5rem;box-shadow:0 8px 32px rgba(0,0,0,.3);animation:slideUp .6s ease-out both}
+.upload-zone{border:2px dashed rgba(255,255,255,.12);border-radius:12px;padding:3rem 2rem;text-align:center;cursor:pointer;transition:all .3s ease;position:relative}
+.upload-zone:hover,.upload-zone.dragover{border-color:#06b6d4;background:rgba(6,182,212,.05);box-shadow:0 0 30px rgba(6,182,212,.1)}
+.upload-zone svg{opacity:.4;transition:opacity .3s}.upload-zone:hover svg{opacity:.7}
+.upload-zone p{color:rgba(255,255,255,.45);margin-top:.8rem;font-size:.92rem}
+.upload-zone p strong{color:rgba(255,255,255,.7)}
+.file-info{margin-top:.8rem;color:#06b6d4;font-weight:600;font-size:.9rem}
+.file-info .size{color:rgba(255,255,255,.4);font-weight:400;margin-left:.5rem}
+.btn-wrap{text-align:center;margin-top:1.2rem}
+.btn{background:linear-gradient(135deg,#06b6d4,#8b5cf6);background-size:200% 200%;color:#fff;border:none;padding:.8rem 2.2rem;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .3s;animation:gradShift 4s ease infinite}
+@keyframes gradShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(6,182,212,.3)}
+.btn:disabled{opacity:.3;cursor:not-allowed;transform:none;box-shadow:none}
+.progress{text-align:center;margin-top:1.2rem;display:none}
+.progress .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#06b6d4;margin-right:8px;animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+.progress .status-text{color:rgba(255,255,255,.6);font-size:.9rem}
+.error{color:#ef4444;text-align:center;margin-top:1rem;display:none}
+.hidden{display:none!important}
+.results{animation:slideUp .6s ease-out both;animation-delay:.1s}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:1.2rem;text-align:center;transition:transform .2s}
+.stat:hover{transform:translateY(-2px)}
+.stat .label{color:rgba(255,255,255,.4);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem}
+.stat .value{font-size:1.8rem;font-weight:800;background:linear-gradient(135deg,#06b6d4,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.chart-wrap{margin-bottom:1.5rem;display:flex;justify-content:center}
+.chart-wrap canvas{max-height:280px}
+.tbl-wrap{overflow-x:auto;border-radius:12px;border:1px solid rgba(255,255,255,.06)}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+thead{position:sticky;top:0;z-index:2}
+th{text-align:left;padding:.75rem 1rem;background:rgba(255,255,255,.04);color:rgba(255,255,255,.45);font-weight:600;font-size:.73rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(255,255,255,.06)}
+td{padding:.7rem 1rem;border-bottom:1px solid rgba(255,255,255,.03);transition:all .2s}
+tr{animation:fadeIn .4s ease-out both}
+tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+tr:hover td{background:rgba(6,182,212,.06);border-left-color:#06b6d4}
+tr td:first-child{border-left:3px solid transparent;transition:border-color .2s}
+tr:hover td:first-child{border-left-color:#06b6d4}
+.pill{display:inline-block;padding:.2rem .65rem;border-radius:20px;font-weight:700;font-size:.8rem}
+.pill-red{background:rgba(239,68,68,.15);color:#ef4444}
+.pill-amber{background:rgba(245,158,11,.15);color:#f59e0b}
+.disease-tag{display:inline-block;background:rgba(139,92,246,.12);color:#a78bfa;padding:.15rem .6rem;border-radius:6px;font-size:.78rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.actions{display:flex;gap:1rem;margin-top:1.2rem;justify-content:center}
+.btn-sm{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.7);padding:.5rem 1.2rem;border-radius:8px;font-size:.85rem;cursor:pointer;transition:all .2s}
+.btn-sm:hover{background:rgba(255,255,255,.1);color:#fff}
+footer{text-align:center;margin-top:3rem;color:rgba(255,255,255,.2);font-size:.78rem}
+footer span{color:rgba(255,255,255,.35)}
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="container">
+<header>
+  <h1>&#x1f9ec; VCF Variant Risk Analyzer</h1>
+  <p class="subtitle">Upload a VCF file to scan for pathogenic mutations using XGBoost</p>
+</header>
+
+<div class="glass" id="uploadCard">
+  <div class="upload-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <svg width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M20 16.7V19a2 2 0 01-2 2H6a2 2 0 01-2-2v-2.3"/></svg>
+    <p>Click or drag &amp; drop a <strong>.vcf</strong> or <strong>.vcf.gz</strong> file</p>
+    <div class="file-info hidden" id="fileInfo"><span id="fileName"></span><span class="size" id="fileSize"></span></div>
+  </div>
+  <input type="file" id="fileInput" accept=".vcf,.gz">
+  <div class="btn-wrap"><button class="btn" id="analyzeBtn" disabled>Analyze Variants</button></div>
+  <div class="progress" id="progress"><span class="dot"></span><span class="status-text" id="statusText">Uploading...</span></div>
+  <div class="error" id="errorMsg"></div>
+</div>
+
+<div class="hidden" id="results">
+  <div class="glass results">
+    <div class="stats">
+      <div class="stat"><div class="label">Variants Scanned</div><div class="value" id="totalScanned">0</div></div>
+      <div class="stat"><div class="label">High-Risk Found</div><div class="value" id="risksFound">0</div></div>
+      <div class="stat"><div class="label">Processing Time</div><div class="value" id="timeVal">—</div></div>
+      <div class="stat"><div class="label">Status</div><div class="value" id="statusVal">—</div></div>
+    </div>
+  </div>
+  <div class="glass results" style="animation-delay:.2s">
+    <h3 style="color:rgba(255,255,255,.5);font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem">Chromosome Distribution</h3>
+    <div class="chart-wrap"><canvas id="chromChart"></canvas></div>
+  </div>
+  <div class="glass results" style="animation-delay:.3s">
+    <h3 style="color:rgba(255,255,255,.5);font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem">Top Dangerous Mutations</h3>
+    <div class="tbl-wrap">
+      <table><thead><tr><th>#</th><th>Chr</th><th>Position</th><th>Mutation</th><th>Risk</th><th>Disease</th></tr></thead><tbody id="tbody"></tbody></table>
+    </div>
+    <div class="actions">
+      <button class="btn-sm" id="csvBtn">Download CSV</button>
+    </div>
+  </div>
+</div>
+
+<footer>Powered by <span>XGBoost + ClinVar</span></footer>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const dropZone=$("dropZone"),fileInput=$("fileInput"),analyzeBtn=$("analyzeBtn"),
+      progress=$("progress"),statusText=$("statusText"),errorEl=$("errorMsg"),
+      resultsEl=$("results"),fileInfoEl=$("fileInfo");
+let selectedFile=null,chartInstance=null,lastData=null;
+
+function fmtSize(b){if(b<1024)return b+" B";if(b<1048576)return(b/1024).toFixed(1)+" KB";return(b/1048576).toFixed(1)+" MB"}
+
+function selectFile(f){
+  selectedFile=f;
+  $("fileName").textContent=f.name;
+  $("fileSize").textContent=fmtSize(f.size);
+  fileInfoEl.classList.remove("hidden");
+  analyzeBtn.disabled=false;
+}
+
+function countUp(el,target,dur=1200){
+  const start=performance.now();
+  const fmt=n=>n.toLocaleString();
+  (function step(now){
+    const p=Math.min((now-start)/dur,1);
+    const ease=1-Math.pow(1-p,3);
+    el.textContent=fmt(Math.floor(target*ease));
+    if(p<1)requestAnimationFrame(step);
+  })(start);
+}
+
+fileInput.addEventListener("change",e=>{if(e.target.files[0])selectFile(e.target.files[0])});
+dropZone.addEventListener("dragover",e=>{e.preventDefault();dropZone.classList.add("dragover")});
+dropZone.addEventListener("dragleave",()=>dropZone.classList.remove("dragover"));
+dropZone.addEventListener("drop",e=>{e.preventDefault();dropZone.classList.remove("dragover");if(e.dataTransfer.files[0])selectFile(e.dataTransfer.files[0])});
+
+analyzeBtn.addEventListener("click",async()=>{
+  if(!selectedFile)return;
+  analyzeBtn.disabled=true;
+  progress.style.display="block";errorEl.style.display="none";
+  resultsEl.classList.add("hidden");
+  statusText.textContent="Uploading...";
+  const t0=performance.now();
+  const fd=new FormData();fd.append("file",selectedFile);
+  try{
+    statusText.textContent="Analyzing variants...";
+    const r=await fetch("/analyze",{method:"POST",body:fd});
+    const d=await r.json();
+    if(d.status==="error"){errorEl.textContent=d.message;errorEl.style.display="block";return}
+    statusText.textContent="Building report...";
+    lastData=d;
+    const elapsed=((performance.now()-t0)/1000).toFixed(1)+"s";
+    await new Promise(r=>setTimeout(r,300));
+    countUp($("totalScanned"),d.total_variants_scanned);
+    countUp($("risksFound"),d.top_risks.length);
+    $("timeVal").textContent=elapsed;
+    $("statusVal").textContent=d.status;
+    const tb=$("tbody");tb.innerHTML="";
+    d.top_risks.forEach((v,i)=>{
+      const cls=v.risk_score>.95?"pill pill-red":"pill pill-amber";
+      const dis=v.associated_disease&&v.associated_disease!=="Novel/Unknown Pathology"
+        ?`<span class="disease-tag" title="`+v.associated_disease+`">`+v.associated_disease+`</span>`
+        :`<span style="color:rgba(255,255,255,.25)">Unknown</span>`;
+      const tr=document.createElement("tr");
+      tr.style.animationDelay=(i*30)+"ms";
+      tr.innerHTML=`<td>${i+1}</td><td>${v.chromosome}</td><td>${v.position}</td><td>${v.mutation}</td><td><span class="${cls}">${v.risk_score.toFixed(4)}</span></td><td>${dis}</td>`;
+      tb.appendChild(tr);
+    });
+    renderChart(d.top_risks);
+    resultsEl.classList.remove("hidden");
+    setTimeout(()=>resultsEl.scrollIntoView({behavior:"smooth",block:"start"}),100);
+  }catch(e){errorEl.textContent="Network error: "+e.message;errorEl.style.display="block"}
+  finally{progress.style.display="none";analyzeBtn.disabled=false}
+});
+
+function renderChart(risks){
+  const counts={};
+  risks.forEach(v=>{const c=v.chromosome;counts[c]=(counts[c]||0)+1});
+  const labels=Object.keys(counts).sort((a,b)=>{
+    const na=parseInt(a.replace(/\\D/g,"")),nb=parseInt(b.replace(/\\D/g,""));
+    return(isNaN(na)?99:na)-(isNaN(nb)?99:nb);
+  });
+  const data=labels.map(l=>counts[l]);
+  const colors=["#06b6d4","#8b5cf6","#f59e0b","#ef4444","#10b981","#ec4899","#3b82f6","#f97316","#14b8a6","#a855f7","#64748b","#22d3ee","#e879f9","#84cc16","#fb923c","#38bdf8","#c084fc","#facc15","#f87171","#4ade80","#818cf8","#fb7185","#2dd4bf","#a3e635"];
+  if(chartInstance)chartInstance.destroy();
+  chartInstance=new Chart($("chromChart"),{type:"doughnut",data:{labels,datasets:[{data,backgroundColor:colors.slice(0,labels.length),borderWidth:0,hoverOffset:8}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{color:"rgba(255,255,255,.5)",font:{size:11},padding:8,usePointStyle:true,pointStyleWidth:8}}}}});
+}
+
+$("csvBtn").addEventListener("click",()=>{
+  if(!lastData)return;
+  let csv="Rank,Chromosome,Position,Mutation,Risk Score,Disease\\n";
+  lastData.top_risks.forEach((v,i)=>{
+    csv+=[i+1,v.chromosome,v.position,`"${v.mutation}"`,v.risk_score.toFixed(6),`"${(v.associated_disease||"Unknown").replace(/"/g,"''")}"`].join(",")+("\\n");
+  });
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="vcf_analysis_results.csv";a.click();
+});
+</script>
+</body>
+</html>
+"""
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    """Serve the single-page upload UI."""
+    return _INDEX_HTML
+
 
 @app.post("/analyze")
 async def analyze_vcf(file: UploadFile = File(...)) -> JSONResponse:

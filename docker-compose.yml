@@ -7,3 +7,14 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "2.0"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

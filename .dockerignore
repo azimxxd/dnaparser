@@ -5,3 +5,11 @@ __pycache__/
 *.pyd
 *.log
 .git/
+*.vcf
+*.vcf.gz
+train_model.py
+generate_sample.py
+pipeline.py
+README.md
+.dockerignore
+.gitignore
