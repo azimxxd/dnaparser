@@ -86,3 +86,23 @@ Typical response shape:
   ]
 }
 ```
+
+## 5. AI Review via Google API
+
+Frontend now requests real AI interpretation from backend endpoint `POST /ai-review`.
+
+Set Google API key before running:
+
+```bash
+export GOOGLE_API_KEY="your_google_api_key"
+export GOOGLE_GEMINI_MODEL="gemini-2.0-flash"  # optional
+```
+
+If `GOOGLE_API_KEY` is not set, backend returns a local fallback summary.
+
+## 6. Mock Auth Endpoints
+
+The UI includes mock registration/login (in-memory, reset on server restart):
+
+- `POST /auth/register`
+- `POST /auth/login`
