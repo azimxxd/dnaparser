@@ -4,6 +4,11 @@ FastAPI service for VCF variant risk analysis.
 
 The API accepts a `.vcf` / `.vcf.gz` file, scores variants with a trained XGBoost model, and returns top high-risk mutations with optional disease mapping.
 
+
+
+#YOUTUBE DEMO VIDEO
+https://youtu.be/mt_QIrikuv8
+
 ## 1. Run Locally
 
 ### Prerequisites
