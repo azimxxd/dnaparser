@@ -1,4 +1,4 @@
-# DNAParser
+# Clinical Lens
 
 FastAPI service for VCF variant risk analysis.
 
